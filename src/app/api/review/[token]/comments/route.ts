@@ -1,7 +1,23 @@
 import { NextResponse } from "next/server";
 import { commentSchema, validateAttachments } from "@/lib/validation";
-import { addCustomerComment } from "@/lib/data/review";
+import { addCustomerComment, getReviewContext, markCommentsRead } from "@/lib/data/review";
 import { reviewErrorResponse } from "../_lib";
+
+/** Lightweight poll for the customer thread so replies appear without refresh. */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  try {
+    const { token } = await params;
+    const context = await getReviewContext(token);
+    // Opening the thread counts as reading the latest employee replies.
+    await markCommentsRead(token);
+    return NextResponse.json({ ok: true, comments: context.comments });
+  } catch (err) {
+    return reviewErrorResponse(err);
+  }
+}
 
 export async function POST(
   request: Request,

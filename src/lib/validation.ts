@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { MAX_ATTACHMENTS, MAX_FILE_SIZE, PROOF_MIME_TYPES } from "@/lib/types";
+import {
+  fileExtension,
+  MAX_ATTACHMENTS,
+  MAX_FILE_SIZE,
+  PROOF_EXTENSIONS,
+  PROOF_MIME_TYPES,
+} from "@/lib/types";
 
 export const approveSchema = z.object({
   confirmed: z.literal(true, {
@@ -28,7 +34,7 @@ export const checklistResponseSchema = z.object({
 
 export const createProjectSchema = z.object({
   name: z.string().trim().min(1, "Project name is required.").max(200),
-  jobNumber: z.string().trim().max(50).optional().default(""),
+  assignedTo: z.string().trim().max(200).optional().default(""),
   customerName: z.string().trim().min(1, "Customer name is required.").max(200),
   customerEmail: z.string().trim().email("Enter a valid customer email.").max(320),
   customerCompany: z.string().trim().max(200).optional().default(""),
@@ -44,8 +50,10 @@ export const checklistItemSchema = z.object({
 });
 
 export const clickupSettingsSchema = z.object({
-  accessToken: z.string().trim().min(1, "API token is required.").max(500),
-  workspaceId: z.string().trim().min(1, "Workspace ID is required.").max(50),
+  // Optional: falls back to CLICKUP_API_TOKEN in .env.local when left blank,
+  // so changing the submissions list never requires re-typing the token.
+  accessToken: z.string().trim().max(500).optional().default(""),
+  workspaceId: z.string().trim().max(50).optional().default(""),
   spaceId: z.string().trim().max(50).optional().default(""),
   folderId: z.string().trim().max(50).optional().default(""),
   listId: z.string().trim().max(50).optional().default(""),
@@ -67,11 +75,15 @@ const ATTACHMENT_MIME_TYPES = [
 ];
 
 export function validateProofFile(file: File): string | null {
-  if (!PROOF_MIME_TYPES.includes(file.type)) {
-    return "Proofs must be PNG, JPG/JPEG, or PDF.";
+  // Match on either signal: browsers report an empty MIME type for some
+  // formats (.heic, .ai, .psd) and a wrong one for others.
+  const typeOk = PROOF_MIME_TYPES.includes(file.type);
+  const extOk = PROOF_EXTENSIONS.includes(fileExtension(file.name));
+  if (!typeOk && !extOk) {
+    return `"${file.name}" isn't a supported proof. Use an image (PNG, JPG, GIF, WEBP, AVIF, SVG, BMP, TIFF, HEIC), a PDF, or AI/EPS/PSD.`;
   }
   if (file.size > MAX_FILE_SIZE) {
-    return "Proof files must be 25 MB or smaller.";
+    return `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(0)} MB — proofs must be ${MAX_FILE_SIZE / 1024 / 1024} MB or smaller.`;
   }
   return null;
 }

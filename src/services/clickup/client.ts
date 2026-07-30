@@ -72,6 +72,38 @@ export const clickUpApi = {
     return request<{ teams: { id: string; name: string }[] }>(token, "/team");
   },
 
+  getSpaces(token: string, workspaceId: string) {
+    return request<{ spaces: { id: string; name: string }[] }>(
+      token,
+      `/team/${workspaceId}/space?archived=false`
+    );
+  },
+
+  getFolderlessLists(token: string, spaceId: string) {
+    return request<{ lists: { id: string; name: string }[] }>(
+      token,
+      `/space/${spaceId}/list?archived=false`
+    );
+  },
+
+  createList(token: string, spaceId: string, name: string) {
+    return request<{ id: string; name: string }>(token, `/space/${spaceId}/list`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  createTask(
+    token: string,
+    listId: string,
+    body: { name: string; markdown_description?: string }
+  ) {
+    return request<{ id: string; url: string }>(token, `/list/${listId}/task`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+
   createWebhook(token: string, workspaceId: string, endpoint: string) {
     return request<{ id: string; webhook: { id: string } }>(
       token,

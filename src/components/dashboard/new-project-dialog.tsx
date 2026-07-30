@@ -29,7 +29,7 @@ export function NewProjectDialog() {
     const form = new FormData(e.currentTarget);
     const result = await createProjectAction({
       name: form.get("name"),
-      jobNumber: form.get("jobNumber") ?? "",
+      assignedTo: form.get("assignedTo") ?? "",
       customerName: form.get("customerName"),
       customerEmail: form.get("customerEmail"),
       customerCompany: form.get("customerCompany") ?? "",
@@ -66,8 +66,8 @@ export function NewProjectDialog() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="jobNumber">Job number</Label>
-              <Input id="jobNumber" name="jobNumber" placeholder="JOB-1043" />
+              <Label htmlFor="assignedTo">Assigned to</Label>
+              <Input id="assignedTo" name="assignedTo" placeholder="Who's handling this" />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="dueDate">Due date</Label>

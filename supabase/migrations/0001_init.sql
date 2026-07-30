@@ -88,9 +88,9 @@ create table projects (
   id           uuid primary key default gen_random_uuid(),
   company_id   uuid not null references companies (id) on delete cascade,
   name         text not null,
-  job_number   text,
   customer_id  uuid references customers (id) on delete set null,
   designer_id  uuid references profiles (id) on delete set null,
+  contact_name text,
   due_date     date,
   status       project_status not null default 'draft',
   created_at   timestamptz not null default now(),
@@ -427,10 +427,14 @@ create policy "members manage clickup links" on clickup_task_links
 -- Storage buckets (private; access via signed URLs only)
 -- ---------------------------------------------------------------------------
 
+-- 50 MB ceiling matches MAX_FILE_SIZE in src/lib/types.ts. MIME types are left
+-- open here and validated server-side instead: browsers report empty or wrong
+-- types for common print formats (.heic, .ai, .psd), which a bucket-level
+-- allowlist would reject outright.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
-  ('proofs', 'proofs', false, 26214400, array['image/png', 'image/jpeg', 'application/pdf']),
-  ('attachments', 'attachments', false, 26214400, null)
+  ('proofs', 'proofs', false, 52428800, null),
+  ('attachments', 'attachments', false, 52428800, null)
 on conflict (id) do nothing;
 
 create policy "members upload proofs" on storage.objects

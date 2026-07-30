@@ -15,9 +15,12 @@ import type { ProofVersion } from "@/lib/types";
 export function VersionUploadCard({
   projectId,
   versions,
+  onDone,
 }: {
   projectId: string;
   versions: ProofVersion[];
+  /** Called after a successful upload, so hosts outside the dashboard can refresh. */
+  onDone?: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [notes, setNotes] = useState("");
@@ -38,6 +41,7 @@ export function VersionUploadCard({
       toast.success(`Version ${latest + 1} uploaded — the customer has been notified.`);
       setFile(null);
       setNotes("");
+      onDone?.();
     } else {
       toast.error(result.error);
     }
@@ -56,7 +60,7 @@ export function VersionUploadCard({
             ref={inputRef}
             type="file"
             hidden
-            accept="image/png,image/jpeg,application/pdf"
+            accept="image/*,application/pdf,.pdf,.tif,.tiff,.heic,.heif,.ai,.eps,.psd"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           />
           <div className="flex flex-wrap items-center gap-3">
@@ -64,7 +68,9 @@ export function VersionUploadCard({
               <FileUp className="size-4" /> {file ? "Change file" : "Choose proof file"}
             </Button>
             <span className="truncate text-sm text-muted-foreground">
-              {file ? `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)` : "PNG, JPG, or PDF up to 25 MB"}
+              {file
+                ? `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`
+                : "Any image, PDF, or AI/EPS/PSD up to 50 MB"}
             </span>
           </div>
           <div className="grid gap-1.5">

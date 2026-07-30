@@ -1,9 +1,29 @@
 import "server-only";
 import { isDemoMode } from "@/lib/env";
 import { demoDb } from "@/lib/data/demo-store";
+import { loadClickUpConnection } from "@/lib/data/clickup-store";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { clickUpApi } from "@/services/clickup/client";
 import type { ClickUpConnection, ClickUpTaskLink, ProjectStatus } from "@/lib/types";
+
+/**
+ * Demo-mode connection resolution shared by every entry point: in-memory
+ * (set this session) → persisted file (survives restarts) → env token.
+ */
+async function resolveDemoConnection(): Promise<
+  (ClickUpConnection & { access_token: string }) | null
+> {
+  const inMemory = demoDb().clickupConnection;
+  if (inMemory?.access_token) {
+    return inMemory as ClickUpConnection & { access_token: string };
+  }
+  const persisted = loadClickUpConnection();
+  if (persisted) {
+    demoDb().clickupConnection = persisted;
+    return persisted;
+  }
+  return getEnvConnection();
+}
 
 /**
  * Failure-tolerant sync layer between ProofFlow and ClickUp.
@@ -29,9 +49,8 @@ interface SyncContext {
 async function getSyncContext(projectId: string): Promise<SyncContext> {
   if (isDemoMode()) {
     const db = demoDb();
-    const conn = db.clickupConnection as (ClickUpConnection & { access_token: string }) | null;
     return {
-      connection: conn,
+      connection: await resolveDemoConnection(),
       link: db.clickupTaskLinks.find((l) => l.project_id === projectId) ?? null,
     };
   }
@@ -52,7 +71,7 @@ async function getSyncContext(projectId: string): Promise<SyncContext> {
     .select("*")
     .eq("company_id", project?.company_id ?? "")
     .maybeSingle();
-  return { connection, link };
+  return { connection: connection ?? (await getEnvConnection()), link };
 }
 
 async function recordSyncResult(
@@ -67,6 +86,132 @@ async function recordSyncResult(
   }
   const supabase = createSupabaseAdminClient();
   await supabase.from("clickup_task_links").update(stamped).eq("id", linkId);
+}
+
+/**
+ * Connection from the CLICKUP_API_TOKEN env key: set it in .env.local and the
+ * app links to ClickUp with no settings-page setup. The workspace and a
+ * "ProofFlow" submissions list are resolved once and cached; a connection
+ * configured in Settings always takes precedence.
+ */
+const envCache = globalThis as unknown as {
+  __proofflowClickupEnv?: { token: string; workspaceId: string | null; listId: string | null };
+};
+
+async function getEnvConnection(): Promise<
+  (ClickUpConnection & { access_token: string }) | null
+> {
+  const token = process.env.CLICKUP_API_TOKEN?.trim();
+  if (!token) return null;
+
+  if (!envCache.__proofflowClickupEnv || envCache.__proofflowClickupEnv.token !== token) {
+    try {
+      const { teams } = await clickUpApi.getWorkspaces(token);
+      const workspaceId = teams[0]?.id ?? null;
+      let listId = process.env.CLICKUP_LIST_ID?.trim() || null;
+      if (!listId && workspaceId) {
+        const { spaces } = await clickUpApi.getSpaces(token, workspaceId);
+        if (spaces[0]) {
+          const { lists } = await clickUpApi.getFolderlessLists(token, spaces[0].id);
+          listId =
+            lists.find((l) => l.name === "ProofFlow")?.id ??
+            (await clickUpApi.createList(token, spaces[0].id, "ProofFlow")).id;
+        }
+      }
+      envCache.__proofflowClickupEnv = { token, workspaceId, listId };
+    } catch (err) {
+      console.error("[clickup] CLICKUP_API_TOKEN setup failed:", err);
+      return null;
+    }
+  }
+
+  const resolved = envCache.__proofflowClickupEnv;
+  return {
+    id: "env",
+    company_id: "env",
+    workspace_id: resolved.workspaceId ?? "",
+    space_id: null,
+    folder_id: null,
+    list_id: resolved.listId,
+    webhook_id: null,
+    sync_settings: { sync_status: true },
+    access_token: token,
+  };
+}
+
+/** Fetch the company's ClickUp connection for a project (link not required). */
+async function getConnectionForProject(
+  projectId: string
+): Promise<(ClickUpConnection & { access_token: string }) | null> {
+  if (isDemoMode()) {
+    return resolveDemoConnection();
+  }
+  const supabase = createSupabaseAdminClient();
+  const { data: project } = await supabase
+    .from("projects")
+    .select("company_id")
+    .eq("id", projectId)
+    .single();
+  if (!project) return null;
+  const { data: connection } = await supabase
+    .from("clickup_connections")
+    .select("*")
+    .eq("company_id", project.company_id)
+    .maybeSingle();
+  return connection ?? (await getEnvConnection());
+}
+
+export interface ClickUpSubmission {
+  kind: "approved" | "changes_requested";
+  projectName: string;
+  customerName: string;
+  customerEmail: string;
+  versionNumber: number | undefined;
+  comment: string;
+  checklist?: { label: string; checked: boolean }[];
+}
+
+/**
+ * Create a task in the company's "ProofFlow" ClickUp list for a customer
+ * submission (approval or change request), so the team sees it in ClickUp
+ * with zero per-project setup. Never throws.
+ */
+export async function sendSubmissionToClickUp(
+  projectId: string,
+  submission: ClickUpSubmission
+): Promise<void> {
+  try {
+    const connection = await getConnectionForProject(projectId);
+    if (!connection?.list_id) return;
+
+    const approved = submission.kind === "approved";
+    const name = approved
+      ? `✅ Proof approved — ${submission.projectName}`
+      : `🔁 Changes requested — ${submission.projectName}`;
+
+    const lines = [
+      `**Project:** ${submission.projectName}`,
+      `**Customer:** ${submission.customerName} <${submission.customerEmail}>`,
+      submission.versionNumber ? `**Proof version:** ${submission.versionNumber}` : null,
+      `**Submitted:** ${new Date().toLocaleString()}`,
+      submission.comment ? `\n> ${submission.comment.replace(/\n/g, "\n> ")}` : null,
+    ].filter(Boolean) as string[];
+
+    if (approved && submission.checklist?.length) {
+      lines.push(
+        "\n**Checklist:**",
+        ...submission.checklist.map((item) => `- [${item.checked ? "x" : " "}] ${item.label}`)
+      );
+    }
+
+    const task = await clickUpApi.createTask(connection.access_token, connection.list_id, {
+      name,
+      markdown_description: lines.join("\n"),
+    });
+    console.log(`[clickup] submission task created: ${task.url}`);
+  } catch (err) {
+    console.error("[clickup] sendSubmissionToClickUp failed:", err);
+  }
 }
 
 /** Push a ProofFlow status change to the linked ClickUp task. Never throws. */

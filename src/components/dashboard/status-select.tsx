@@ -15,9 +15,12 @@ import { STATUS_LABELS, type ProjectStatus } from "@/lib/types";
 export function StatusSelect({
   projectId,
   status,
+  onDone,
 }: {
   projectId: string;
   status: ProjectStatus;
+  /** Called after a status change, so hosts outside the dashboard can refresh. */
+  onDone?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -28,7 +31,8 @@ export function StatusSelect({
       onValueChange={(value) =>
         startTransition(async () => {
           const result = await updateStatusAction(projectId, value as ProjectStatus);
-          if (!result.ok) toast.error(result.error);
+          if (result.ok) onDone?.();
+          else toast.error(result.error);
         })
       }
     >

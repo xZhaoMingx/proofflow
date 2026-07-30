@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { logoutAction } from "@/app/login/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,9 @@ export function UserMenu({ profile, demo }: { profile: Profile; demo: boolean })
   const router = useRouter();
 
   async function signOut() {
-    if (!demo) {
+    if (demo) {
+      await logoutAction();
+    } else {
       const supabase = createSupabaseBrowserClient();
       await supabase.auth.signOut();
     }
@@ -49,8 +52,8 @@ export function UserMenu({ profile, demo }: { profile: Profile; demo: boolean })
           <p className="text-xs font-normal text-muted-foreground">{profile.email}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={signOut} disabled={demo}>
-          <LogOut className="size-4" /> {demo ? "Sign out (disabled in demo)" : "Sign out"}
+        <DropdownMenuItem onClick={signOut}>
+          <LogOut className="size-4" /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -2,8 +2,10 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Next 16 proxy (formerly middleware): refreshes the Supabase auth session
- * cookie on dashboard navigation. Skipped entirely in demo mode.
+ * Next 16 proxy (formerly middleware): in Supabase mode, refreshes the auth
+ * session cookie. Demo-mode access control is enforced in Server Components
+ * and route handlers via getSessionProfile (which reads the signed session
+ * cookie), so no proxy work is needed there.
  */
 export default async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -35,9 +37,10 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Dashboard surfaces only; customer review pages use token auth.
+    // Dashboard surfaces and their data APIs; customer review pages use token auth.
     "/projects/:path*",
     "/settings/:path*",
+    "/api/projects/:path*",
     "/login",
   ],
 };

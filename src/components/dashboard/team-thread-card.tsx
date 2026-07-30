@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { format } from "date-fns";
 import { Loader2, Lock, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -27,10 +27,29 @@ export function TeamThreadCard({
   profileId: string;
 }) {
   const [tab, setTab] = useState<"customer" | "internal">("customer");
+  const [thread, setThread] = useState<Comment[]>(comments);
   const [body, setBody] = useState("");
   const [pending, startTransition] = useTransition();
 
-  const visible = comments.filter((c) => (tab === "internal" ? c.is_internal : !c.is_internal));
+  // Poll so the customer's messages show up here without refreshing the page.
+  const refetch = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/comments`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { comments?: Comment[] };
+      if (data.comments) setThread(data.comments);
+    } catch {
+      // Transient network hiccup; the next tick retries.
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    // Initial messages come from server-rendered props; poll for new ones.
+    const interval = setInterval(refetch, 4000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
+  const visible = thread.filter((c) => (tab === "internal" ? c.is_internal : !c.is_internal));
 
   function submit() {
     const text = body.trim();
@@ -39,6 +58,7 @@ export function TeamThreadCard({
       const result = await addEmployeeCommentAction(projectId, text, tab === "internal");
       if (result.ok) {
         setBody("");
+        await refetch(); // Show the sent reply immediately.
         if (tab === "customer") toast.success("Reply sent — the customer has been notified.");
       } else {
         toast.error(result.error);

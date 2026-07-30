@@ -1,5 +1,6 @@
 import "server-only";
 import { mkdir, writeFile } from "fs/promises";
+import os from "os";
 import path from "path";
 import { isDemoMode } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -33,6 +34,14 @@ function safeName(name: string): string {
 }
 
 /**
+ * Demo-mode upload root. Anchored to the OS temp dir rather than the app's
+ * public/ folder: process.cwd() varies with how the server was launched, and
+ * files added to public/ after startup aren't reliably served. Files here are
+ * streamed back through /api/demo-file/*.
+ */
+export const DEMO_UPLOAD_ROOT = path.join(os.tmpdir(), "proofflow-demo-uploads");
+
+/**
  * Store an uploaded file and return its storage path.
  * Supabase mode: private bucket keyed company/project/... (signed URLs only).
  * Demo mode: written under public/demo-uploads (dev-only convenience).
@@ -45,11 +54,11 @@ export async function storeFile(
   const key = [...keyParts, safeName(file.name)].join("/");
 
   if (isDemoMode()) {
-    const dir = path.join(process.cwd(), "public", "demo-uploads", bucket, ...keyParts);
+    const dir = path.join(DEMO_UPLOAD_ROOT, bucket, ...keyParts);
     await mkdir(dir, { recursive: true });
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(path.join(dir, safeName(file.name)), buffer);
-    return `/demo-uploads/${bucket}/${key}`;
+    return `/api/demo-file/${bucket}/${key}`;
   }
 
   const supabase = createSupabaseAdminClient();

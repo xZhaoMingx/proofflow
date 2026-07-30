@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { saveClickUpAction } from "@/app/(dashboard)/actions";
+import { getClickUpListsAction, saveClickUpAction } from "@/app/(dashboard)/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ConnectionValues {
   workspaceId: string;
@@ -20,6 +27,11 @@ interface ConnectionValues {
   syncDueDate: boolean;
   syncComments: boolean;
   syncAttachments: boolean;
+}
+
+interface ListOption {
+  id: string;
+  label: string;
 }
 
 export function ClickUpSettingsForm({
@@ -43,6 +55,24 @@ export function ClickUpSettingsForm({
   );
   const [accessToken, setAccessToken] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lists, setLists] = useState<ListOption[]>([]);
+  const [loadingLists, setLoadingLists] = useState(false);
+
+  const connected = Boolean(connection);
+
+  async function loadLists() {
+    setLoadingLists(true);
+    const result = await getClickUpListsAction();
+    setLoadingLists(false);
+    if (result.ok && result.data) {
+      setLists(result.data.lists);
+      if (result.data.lists.length === 0) {
+        toast.info("No lists found in your ClickUp workspace.");
+      }
+    } else if (!result.ok) {
+      toast.error(result.error);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +81,7 @@ export function ClickUpSettingsForm({
     setBusy(false);
     if (result.ok) {
       setAccessToken("");
-      toast.success("ClickUp connected — token verified and saved.");
+      toast.success("Saved — submissions will go to your chosen list.");
     } else {
       toast.error(result.error);
     }
@@ -67,94 +97,116 @@ export function ClickUpSettingsForm({
     { key: "syncAttachments", label: "Sync attachments", hint: "Copy customer attachments to the task" },
   ];
 
-  return (
-    <Card className="rounded-2xl">
-      <CardContent>
-        {connection && (
-          <p className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-            <CheckCircle2 className="size-4" /> Connected to workspace {connection.workspaceId}
-          </p>
-        )}
-        {!isAdmin ? (
+  const selectedLabel = lists.find((l) => l.id === values.listId)?.label;
+
+  if (!isAdmin) {
+    return (
+      <Card className="rounded-2xl">
+        <CardContent>
           <p className="text-sm text-muted-foreground">
             Only admins can change the ClickUp connection.
           </p>
-        ) : (
-          <form onSubmit={submit} className="grid gap-4">
-            <div className="grid gap-1.5">
-              <Label htmlFor="cu-token">Personal API token</Label>
-              <Input
-                id="cu-token"
-                type="password"
-                required
-                placeholder={connection ? "Enter token again to update settings" : "pk_…"}
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                ClickUp → Settings → Apps. Stored server-side and never sent to the browser.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="cu-workspace">Workspace ID</Label>
-                <Input
-                  id="cu-workspace"
-                  required
-                  value={values.workspaceId}
-                  onChange={(e) => set("workspaceId", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cu-space">Space ID (optional)</Label>
-                <Input
-                  id="cu-space"
-                  value={values.spaceId}
-                  onChange={(e) => set("spaceId", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cu-folder">Folder ID (optional)</Label>
-                <Input
-                  id="cu-folder"
-                  value={values.folderId}
-                  onChange={(e) => set("folderId", e.target.value)}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="cu-list">List ID (optional)</Label>
-                <Input
-                  id="cu-list"
-                  value={values.listId}
-                  onChange={(e) => set("listId", e.target.value)}
-                />
-              </div>
-            </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-            <Separator />
-
-            <div className="grid gap-3">
-              {toggles.map((toggle) => (
-                <div key={toggle.key} className="flex items-center justify-between gap-4">
-                  <div>
-                    <Label htmlFor={`toggle-${toggle.key}`}>{toggle.label}</Label>
-                    <p className="text-xs text-muted-foreground">{toggle.hint}</p>
-                  </div>
-                  <Switch
-                    id={`toggle-${toggle.key}`}
-                    checked={values[toggle.key] as boolean}
-                    onCheckedChange={(checked) => set(toggle.key, checked)}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <Button type="submit" disabled={busy || !accessToken} className="justify-self-start">
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              {connection ? "Update connection" : "Connect ClickUp"}
-            </Button>
-          </form>
+  return (
+    <Card className="rounded-2xl">
+      <CardContent>
+        {connected && (
+          <p className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+            <CheckCircle2 className="size-4" /> Connected to ClickUp
+            {connection?.workspaceId ? ` (workspace ${connection.workspaceId})` : ""}. Settings are
+            saved and survive restarts.
+          </p>
         )}
+
+        <form onSubmit={submit} className="grid gap-5">
+          {/* Submissions list — the main control */}
+          <div className="grid gap-1.5">
+            <Label>Submissions list</Label>
+            <p className="text-xs text-muted-foreground">
+              Every approval and change request creates a task in this ClickUp list.
+            </p>
+            <div className="flex gap-2">
+              <Select value={values.listId} onValueChange={(v) => set("listId", v)}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Load your lists, then choose one" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lists.map((list) => (
+                    <SelectItem key={list.id} value={list.id}>
+                      {list.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="outline" onClick={loadLists} disabled={loadingLists}>
+                {loadingLists ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="size-4" />
+                )}
+                {lists.length ? "Refresh" : "Load my lists"}
+              </Button>
+            </div>
+            {values.listId && (
+              <p className="text-xs text-muted-foreground">
+                Selected list ID: <span className="font-mono">{values.listId}</span>
+                {selectedLabel ? ` — ${selectedLabel}` : ""}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Leave empty to auto-create a list called “ProofFlow”.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Token — optional once .env.local has one */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="cu-token">
+              API token{" "}
+              <span className="font-normal text-muted-foreground">
+                {connected ? "(already set — leave blank to keep it)" : ""}
+              </span>
+            </Label>
+            <Input
+              id="cu-token"
+              type="password"
+              placeholder={connected ? "Leave blank to keep current token" : "pk_…"}
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              ClickUp → Settings → Apps. Stored server-side, never sent to the browser.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="grid gap-3">
+            {toggles.map((toggle) => (
+              <div key={toggle.key} className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor={`toggle-${toggle.key}`}>{toggle.label}</Label>
+                  <p className="text-xs text-muted-foreground">{toggle.hint}</p>
+                </div>
+                <Switch
+                  id={`toggle-${toggle.key}`}
+                  checked={values[toggle.key] as boolean}
+                  onCheckedChange={(checked) => set(toggle.key, checked)}
+                />
+              </div>
+            ))}
+          </div>
+
+          <Button type="submit" disabled={busy} className="justify-self-start">
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            Save
+          </Button>
+        </form>
       </CardContent>
     </Card>
   );

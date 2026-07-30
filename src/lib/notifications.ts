@@ -1,6 +1,7 @@
 import "server-only";
 import { isDemoMode } from "@/lib/env";
 import { demoDb, demoId } from "@/lib/data/demo-store";
+import { listProfiles } from "@/lib/data/accounts";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Customer, NotificationType } from "@/lib/types";
 
@@ -58,7 +59,7 @@ export async function notifyEmployees(
   try {
     if (isDemoMode()) {
       const db = demoDb();
-      for (const profile of db.profiles) {
+      for (const profile of listProfiles(companyId)) {
         db.notifications.unshift({
           id: demoId(),
           company_id: companyId,

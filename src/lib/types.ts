@@ -67,9 +67,11 @@ export interface Project {
   id: string;
   company_id: string;
   name: string;
-  job_number: string | null;
   customer_id: string | null;
   designer_id: string | null;
+  // Free-text name of the person handling this project, shown to the customer
+  // as their contact. Falls back to the designer's name when blank.
+  contact_name: string | null;
   due_date: string | null;
   status: ProjectStatus;
   created_at: string;
@@ -237,6 +239,75 @@ export const STATUS_LABELS: Record<ProjectStatus, string> = {
   archived: "Archived",
 };
 
-export const PROOF_MIME_TYPES = ["image/png", "image/jpeg", "application/pdf"];
-export const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+/** Images a browser renders directly, so they open in the zoomable viewer. */
+export const PREVIEWABLE_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/svg+xml",
+  "image/bmp",
+];
+
+/**
+ * Formats print shops send that browsers can't render. They upload, version,
+ * and download fine; the viewer offers a download instead of a preview.
+ */
+export const NON_PREVIEWABLE_PROOF_TYPES = [
+  "image/tiff",
+  "image/heic",
+  "image/heif",
+  "application/postscript", // .ai / .eps
+  "image/vnd.adobe.photoshop", // .psd
+];
+
+export const PROOF_MIME_TYPES = [
+  ...PREVIEWABLE_IMAGE_TYPES,
+  "application/pdf",
+  ...NON_PREVIEWABLE_PROOF_TYPES,
+];
+
+const PREVIEWABLE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".avif",
+  ".svg",
+  ".bmp",
+];
+
+/** Some browsers report an empty MIME type (.heic, .ai, .psd), so we also match extensions. */
+export const PROOF_EXTENSIONS = [
+  ...PREVIEWABLE_EXTENSIONS,
+  ".pdf",
+  ".tif",
+  ".tiff",
+  ".heic",
+  ".heif",
+  ".ai",
+  ".eps",
+  ".psd",
+];
+
+export function fileExtension(fileName: string): string {
+  const dot = fileName.lastIndexOf(".");
+  return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+}
+
+/** How the viewer should present a proof. */
+export function proofKind(fileType: string, fileName: string): "image" | "pdf" | "file" {
+  const ext = fileExtension(fileName);
+  if (fileType === "application/pdf" || ext === ".pdf") return "pdf";
+  if (PREVIEWABLE_IMAGE_TYPES.includes(fileType)) return "image";
+  if (PREVIEWABLE_EXTENSIONS.includes(ext)) return "image";
+  return "file";
+}
+
+export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 export const MAX_ATTACHMENTS = 10;
+
+/** How long a customer review link stays valid. */
+export const REVIEW_LINK_DAYS = 30;

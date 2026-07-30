@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { CalendarDays, Hash, Palette, User } from "lucide-react";
+import { CalendarDays, Palette, User } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -31,14 +31,9 @@ export function ProjectInfoCard({
       value: customer ? `${customer.name}${customer.company_name ? ` · ${customer.company_name}` : ""}` : "—",
     },
     {
-      icon: <Hash className="size-3.5" />,
-      label: "Job number",
-      value: project.job_number ?? "—",
-    },
-    {
       icon: <Palette className="size-3.5" />,
-      label: "Designer",
-      value: designer?.full_name ?? "—",
+      label: "Your contact",
+      value: project.contact_name ?? designer?.full_name ?? "—",
     },
     {
       icon: <CalendarDays className="size-3.5" />,

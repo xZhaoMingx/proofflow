@@ -13,7 +13,7 @@ import {
   updateProjectStatus,
   uploadVersion,
 } from "@/lib/data/projects";
-import { linkTask, saveConnection } from "@/lib/data/clickup";
+import { getClickUpLists, linkTask, saveConnection } from "@/lib/data/clickup";
 import { pullTask } from "@/services/clickup/sync";
 import {
   checklistItemSchema,
@@ -216,6 +216,20 @@ export async function saveClickUpAction(input: unknown): Promise<ActionResult> {
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to save settings." };
+  }
+}
+
+export async function getClickUpListsAction(): Promise<
+  ActionResult<{ lists: { id: string; label: string }[] }>
+> {
+  try {
+    const profile = await requireProfile();
+    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
+    const result = await getClickUpLists(profile);
+    if (!result.ok) return result;
+    return { ok: true, data: { lists: result.lists } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Failed to load lists." };
   }
 }
 

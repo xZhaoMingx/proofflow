@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { CheckCheck, FileText, Loader2, MessageSquare, Paperclip, Send, X } from "lucide-react";
@@ -39,16 +39,38 @@ function AttachmentChips({ comment, token }: { comment: Comment; token?: string 
 }
 
 export function CommentThread({ token, comments, customerName, onPosted }: CommentThreadProps) {
+  const [thread, setThread] = useState<Comment[]>(comments);
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
-  // Newest messages appear at the bottom; keep the view pinned there.
+  // Poll for new messages so the designer's replies appear without a refresh.
+  const refetch = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/review/${token}/comments`, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { comments?: Comment[] };
+      if (data.comments) setThread(data.comments);
+    } catch {
+      // Transient network hiccup; the next tick retries.
+    }
+  }, [token]);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "nearest" });
-  }, [comments.length]);
+    // Initial messages come from server-rendered props; poll for new ones.
+    const interval = setInterval(refetch, 4000);
+    return () => clearInterval(interval);
+  }, [refetch]);
+
+  // Newest messages sit at the bottom, so pin the list's own scroll there.
+  // Setting scrollTop (rather than scrollIntoView) keeps the page itself from
+  // jumping down to the thread when the review page first loads.
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [thread.length]);
 
   async function submit() {
     if (!body.trim()) return;
@@ -64,6 +86,7 @@ export function CommentThread({ token, comments, customerName, onPosted }: Comme
       }
       setBody("");
       setFiles([]);
+      await refetch(); // Show the sent message immediately.
       onPosted();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not post your comment.");
@@ -80,13 +103,13 @@ export function CommentThread({ token, comments, customerName, onPosted }: Comme
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
-        <div className="flex max-h-96 flex-col gap-3 overflow-y-auto pr-1">
-          {comments.length === 0 && (
+        <div ref={listRef} className="flex max-h-96 flex-col gap-3 overflow-y-auto pr-1">
+          {thread.length === 0 && (
             <p className="py-4 text-center text-sm text-muted-foreground">
               No messages yet — questions and feedback go here.
             </p>
           )}
-          {comments.map((comment) => {
+          {thread.map((comment) => {
             const mine = comment.author_type === "customer";
             const seenByTeam =
               mine && (comment.read_by ?? []).some((key) => !key.startsWith("link:"));
@@ -120,7 +143,6 @@ export function CommentThread({ token, comments, customerName, onPosted }: Comme
               </div>
             );
           })}
-          <div ref={bottomRef} />
         </div>
 
         <div className="flex flex-col gap-2 rounded-xl border p-2">

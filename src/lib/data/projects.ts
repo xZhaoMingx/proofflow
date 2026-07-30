@@ -2,11 +2,13 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { isDemoMode } from "@/lib/env";
 import { demoDb, demoId } from "@/lib/data/demo-store";
+import { findProfile } from "@/lib/data/accounts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { notifyCustomer } from "@/lib/notifications";
 import { storeFile } from "@/lib/storage";
 import { pushComment, pushProjectStatus } from "@/services/clickup/sync";
 import { appUrl } from "@/lib/env";
+import { REVIEW_LINK_DAYS } from "@/lib/types";
 import type {
   ActivityAction,
   ActivityEvent,
@@ -101,10 +103,10 @@ export async function getProjectDetail(
       project,
       company: store.company,
       customer: store.customers.find((c) => c.id === project.customer_id) ?? null,
-      designer:
-        store.profiles
-          .filter((p) => p.id === project.designer_id)
-          .map((p) => ({ id: p.id, full_name: p.full_name }))[0] ?? null,
+      designer: (() => {
+        const p = project.designer_id ? findProfile(project.designer_id) : null;
+        return p ? { id: p.id, full_name: p.full_name } : null;
+      })(),
       versions: store.versions
         .filter((v) => v.project_id === projectId)
         .sort((a, b) => b.version_number - a.version_number),
@@ -164,6 +166,37 @@ export async function getProjectDetail(
   };
 }
 
+/** Lean comment fetch for the employee dashboard's live-polling thread. */
+export async function getProjectComments(
+  profile: Profile,
+  projectId: string
+): Promise<Comment[]> {
+  if (isDemoMode()) {
+    const store = demoDb();
+    // Confirm the project belongs to this employee's company.
+    if (!store.projects.some((p) => p.id === projectId && p.company_id === profile.company_id)) {
+      return [];
+    }
+    return store.comments
+      .filter((c) => c.project_id === projectId)
+      .map((c) => ({
+        ...c,
+        attachments: store.attachments.filter(
+          (a) => a.parent_type === "comment" && a.parent_id === c.id
+        ),
+      }))
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+
+  const supabase = await db();
+  const { data } = await supabase
+    .from("comments")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at");
+  return data ?? [];
+}
+
 async function logActivity(
   projectId: string,
   actorType: AuthorType,
@@ -195,7 +228,7 @@ async function logActivity(
 
 export interface CreateProjectInput {
   name: string;
-  jobNumber: string;
+  assignedTo: string;
   customerName: string;
   customerEmail: string;
   customerCompany: string;
@@ -220,9 +253,9 @@ export async function createProject(
       id: demoId(),
       company_id: profile.company_id,
       name: input.name,
-      job_number: input.jobNumber || null,
       customer_id: customer.id,
       designer_id: profile.id,
+      contact_name: input.assignedTo || profile.full_name,
       due_date: input.dueDate || null,
       status: "draft",
       created_at: new Date().toISOString(),
@@ -230,6 +263,8 @@ export async function createProject(
     };
     store.projects.unshift(project);
     await logActivity(project.id, "employee", profile.full_name, "project_created");
+    // Every project ships with a customer link ready to send.
+    await createReviewLink(profile, project.id, REVIEW_LINK_DAYS);
     return project;
   }
 
@@ -251,9 +286,9 @@ export async function createProject(
     .insert({
       company_id: profile.company_id,
       name: input.name,
-      job_number: input.jobNumber || null,
       customer_id: customer.id,
       designer_id: profile.id,
+      contact_name: input.assignedTo || profile.full_name,
       due_date: input.dueDate || null,
       status: "draft",
     })
@@ -262,6 +297,8 @@ export async function createProject(
   if (error) throw new Error(error.message);
 
   await logActivity(project.id, "employee", profile.full_name, "project_created");
+  // Every project ships with a customer link ready to send.
+  await createReviewLink(profile, project.id, REVIEW_LINK_DAYS);
   return project;
 }
 

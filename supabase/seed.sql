@@ -15,9 +15,9 @@ insert into customers (id, company_id, name, email, company_name) values
   ('22222222-2222-2222-2222-222222222222', '11111111-1111-1111-1111-111111111111',
    'Sally Johnson', 'sally@cornerbakery.example.com', 'Corner Bakery');
 
-insert into projects (id, company_id, name, job_number, customer_id, due_date, status) values
+insert into projects (id, company_id, name, customer_id, due_date, status) values
   ('33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111',
-   'Grand Opening Banner', 'JOB-1042', '22222222-2222-2222-2222-222222222222',
+   'Grand Opening Banner', '22222222-2222-2222-2222-222222222222',
    current_date + 7, 'awaiting_review');
 
 -- Default checklist (per-company; admins can add/remove/reorder/rename)

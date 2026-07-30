@@ -1,16 +1,17 @@
 import "server-only";
 import { isDemoMode } from "@/lib/env";
-import { demoProfile } from "@/lib/data/demo-store";
+import { getSessionProfile as getDemoSessionProfile } from "@/lib/data/accounts";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
 /**
  * Resolve the signed-in employee profile for dashboard pages and APIs.
- * Demo mode: a fixed demo admin so the dashboard is browsable without auth.
- * Supabase mode: session cookie -> profiles row (null means redirect to /login).
+ * Returns null when not signed in (callers redirect to /login).
+ * Demo mode: file-backed email/password account via a signed session cookie.
+ * Supabase mode: Supabase session cookie -> profiles row.
  */
 export async function getSessionProfile(): Promise<Profile | null> {
-  if (isDemoMode()) return demoProfile();
+  if (isDemoMode()) return getDemoSessionProfile();
 
   const supabase = await createSupabaseServerClient();
   const {

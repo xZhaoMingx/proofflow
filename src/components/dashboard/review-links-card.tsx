@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { Check, Copy, Link2, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createReviewLinkAction } from "@/app/(dashboard)/actions";
+import { REVIEW_LINK_DAYS } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +14,12 @@ import type { ReviewLink } from "@/lib/types";
 export function ReviewLinksCard({
   projectId,
   links,
+  onDone,
 }: {
   projectId: string;
   links: ReviewLink[];
+  /** Called after a link is created, so hosts outside the dashboard can refresh. */
+  onDone?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -45,9 +49,13 @@ export function ReviewLinksCard({
             disabled={pending}
             onClick={() =>
               startTransition(async () => {
-                const result = await createReviewLinkAction(projectId, 30);
-                if (result.ok) toast.success("New 30-day review link created.");
-                else toast.error(result.error);
+                const result = await createReviewLinkAction(projectId, REVIEW_LINK_DAYS);
+                if (result.ok) {
+                  toast.success(`New ${REVIEW_LINK_DAYS}-day review link created.`);
+                  onDone?.();
+                } else {
+                  toast.error(result.error);
+                }
               })
             }
           >

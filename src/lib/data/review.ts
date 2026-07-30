@@ -1,10 +1,11 @@
 import "server-only";
 import { isDemoMode } from "@/lib/env";
 import { demoDb, demoId } from "@/lib/data/demo-store";
+import { findProfile } from "@/lib/data/accounts";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { notifyEmployees } from "@/lib/notifications";
 import { storeFile } from "@/lib/storage";
-import { pushProjectStatus } from "@/services/clickup/sync";
+import { pushProjectStatus, sendSubmissionToClickUp } from "@/services/clickup/sync";
 import type {
   ActivityAction,
   ActivityEvent,
@@ -78,10 +79,10 @@ export async function getReviewContext(token: string): Promise<ReviewContext> {
       company: db.company,
       project,
       customer: db.customers.find((c) => c.id === link.customer_id) ?? null,
-      designer:
-        db.profiles
-          .filter((p) => p.id === project.designer_id)
-          .map((p) => ({ id: p.id, full_name: p.full_name }))[0] ?? null,
+      designer: (() => {
+        const p = project.designer_id ? findProfile(project.designer_id) : null;
+        return p ? { id: p.id, full_name: p.full_name } : null;
+      })(),
       versions: db.versions
         .filter((v) => v.project_id === projectId)
         .sort((a, b) => a.version_number - b.version_number),
@@ -376,6 +377,16 @@ export async function approveProof(token: string, input: ApproveInput): Promise<
       input.comment ? ` Comment: "${input.comment}"` : ""
     }`,
   });
+  // Fire-and-forget: the submission also lands as a task in ClickUp.
+  void sendSubmissionToClickUp(projectId, {
+    kind: "approved",
+    projectName: ctx.project.name,
+    customerName,
+    customerEmail,
+    versionNumber: version?.version_number,
+    comment: input.comment,
+    checklist: input.checklist,
+  });
 
   return approval;
 }
@@ -435,6 +446,14 @@ export async function requestChanges(
   await notifyEmployees(companyId, "revision_requested", {
     projectName: ctx.project.name,
     detail: `${customerName} requested changes on version ${version?.version_number}: "${input.comment.slice(0, 200)}"`,
+  });
+  void sendSubmissionToClickUp(projectId, {
+    kind: "changes_requested",
+    projectName: ctx.project.name,
+    customerName,
+    customerEmail,
+    versionNumber: version?.version_number,
+    comment: input.comment,
   });
 
   return request;

@@ -46,11 +46,10 @@ export default async function ProjectDetailPage({
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {customer ? `${customer.name} (${customer.email})` : "No customer"} ·{" "}
-              {project.job_number ?? "no job number"} ·{" "}
               {project.due_date
                 ? `due ${format(new Date(project.due_date), "d MMM yyyy")}`
                 : "no due date"}{" "}
-              · designer {designer?.full_name ?? "—"}
+              · handled by {project.contact_name ?? designer?.full_name ?? "—"}
             </p>
           </div>
           <StatusSelect projectId={project.id} status={project.status} />

@@ -58,7 +58,6 @@ export default async function ProjectsPage() {
                     <StatusBadge status={project.status} />
                   </div>
                   <div className="mt-auto flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{project.job_number ?? "—"}</span>
                     <span>
                       {project.latestVersion > 0
                         ? `v${project.latestVersion}`
