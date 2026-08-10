@@ -26,36 +26,44 @@ export function AuthForm({
     e.preventDefault();
     setBusy(true);
     const form = new FormData(e.currentTarget);
-    const result = await loginAction({
-      email: form.get("email"),
-      password: form.get("password"),
-    });
-    setBusy(false);
-    if (result.ok) {
-      router.push("/projects");
-      router.refresh();
-    } else {
+    try {
+      const result = await loginAction({
+        email: form.get("email"),
+        password: form.get("password"),
+      });
+      if (result.ok) {
+        router.push("/projects");
+        router.refresh();
+        return; // keep the button disabled while we navigate away
+      }
       toast.error(result.error);
+    } catch {
+      toast.error("Couldn't reach the server. Check your connection and try again.");
     }
+    setBusy(false);
   }
 
   async function handleSignup(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
     const form = new FormData(e.currentTarget);
-    const result = await signupAction({
-      fullName: form.get("fullName"),
-      email: form.get("email"),
-      password: form.get("password"),
-      code: form.get("code") ?? "",
-    });
-    setBusy(false);
-    if (result.ok) {
-      router.push("/projects");
-      router.refresh();
-    } else {
+    try {
+      const result = await signupAction({
+        fullName: form.get("fullName"),
+        email: form.get("email"),
+        password: form.get("password"),
+        code: form.get("code") ?? "",
+      });
+      if (result.ok) {
+        router.push("/projects");
+        router.refresh();
+        return;
+      }
       toast.error(result.error);
+    } catch {
+      toast.error("Couldn't reach the server. Check your connection and try again.");
     }
+    setBusy(false);
   }
 
   return (
@@ -121,7 +129,9 @@ export function AuthForm({
                   <Label htmlFor="signup-code">Team code</Label>
                   <Input id="signup-code" name="code" type="password" required />
                   <p className="text-xs text-muted-foreground">
-                    Ask your admin for the team code to join.
+                    {hasAccounts
+                      ? "Enter your team's code to join and see everyone's projects."
+                      : "You're first — pick a team code, then share it so teammates can join."}
                   </p>
                 </div>
               )}

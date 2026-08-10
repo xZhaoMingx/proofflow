@@ -1,12 +1,15 @@
 "use server";
 
 import { z } from "zod";
+import { isSupabaseConfigured } from "@/lib/env";
 import {
   createAccount,
   endSession,
   startSession,
   verifyCredentials,
 } from "@/lib/data/accounts";
+import { createOrJoinTeam, markLogin } from "@/lib/data/team-auth";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Result = { ok: true } | { ok: false; error: string };
 
@@ -27,6 +30,21 @@ export async function loginAction(input: unknown): Promise<Result> {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
+
+  // Supabase mode: sign in through the cookie-based server client so the
+  // session cookie is set for subsequent requests.
+  if (isSupabaseConfigured()) {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (error || !data.user) return { ok: false, error: "Incorrect email or password." };
+    await markLogin(data.user.id);
+    return { ok: true };
+  }
+
+  // Demo mode: file-backed accounts.
   const profile = verifyCredentials(parsed.data.email, parsed.data.password);
   if (!profile) return { ok: false, error: "Incorrect email or password." };
   await startSession(profile.id);
@@ -38,6 +56,27 @@ export async function signupAction(input: unknown): Promise<Result> {
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
+
+  // Supabase mode: create or join the shared team, then sign in.
+  if (isSupabaseConfigured()) {
+    const created = await createOrJoinTeam({
+      fullName: parsed.data.fullName,
+      email: parsed.data.email,
+      password: parsed.data.password,
+      teamCode: parsed.data.code,
+    });
+    if (!created.ok) return created;
+
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+    if (error) return { ok: false, error: "Account created — please log in." };
+    return { ok: true };
+  }
+
+  // Demo mode.
   const result = createAccount({
     fullName: parsed.data.fullName,
     email: parsed.data.email,
@@ -50,5 +89,10 @@ export async function signupAction(input: unknown): Promise<Result> {
 }
 
 export async function logoutAction(): Promise<void> {
+  if (isSupabaseConfigured()) {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.signOut();
+    return;
+  }
   await endSession();
 }
