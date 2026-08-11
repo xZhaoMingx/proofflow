@@ -125,7 +125,7 @@ export async function getReviewContext(token: string): Promise<ReviewContext> {
   ] = await Promise.all([
     supabase
       .from("projects")
-      .select("*, companies(*), customers(*), profiles:designer_id(id, full_name)")
+      .select("*, companies(*), customers!projects_customer_id_fkey(*), profiles:designer_id(id, full_name)")
       .eq("id", projectId)
       .single(),
     supabase
