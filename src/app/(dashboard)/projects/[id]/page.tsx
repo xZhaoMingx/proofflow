@@ -11,6 +11,7 @@ import { ReviewLinksCard } from "@/components/dashboard/review-links-card";
 import { TeamThreadCard } from "@/components/dashboard/team-thread-card";
 import { ClickUpCard } from "@/components/dashboard/clickup-card";
 import { ActivityTimeline } from "@/components/timeline/activity-timeline";
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function ProjectDetailPage({
 
   return (
     <div className="flex flex-col gap-5">
+      <AutoRefresh />
       <div>
         <Link
           href="/projects"
