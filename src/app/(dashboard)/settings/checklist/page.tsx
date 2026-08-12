@@ -11,7 +11,6 @@ export default async function ChecklistSettingsPage() {
   if (!profile) redirect("/login");
 
   const items = await listChecklistItems(profile);
-  const isAdmin = profile.role === "admin";
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
@@ -22,7 +21,7 @@ export default async function ChecklistSettingsPage() {
           reviews for your company.
         </p>
       </div>
-      <ChecklistEditor items={items} isAdmin={isAdmin} />
+      <ChecklistEditor items={items} />
     </div>
   );
 }

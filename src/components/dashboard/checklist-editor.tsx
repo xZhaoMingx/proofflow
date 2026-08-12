@@ -14,13 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { ChecklistItem } from "@/lib/types";
 
-export function ChecklistEditor({
-  items,
-  isAdmin,
-}: {
-  items: ChecklistItem[];
-  isAdmin: boolean;
-}) {
+export function ChecklistEditor({ items }: { items: ChecklistItem[] }) {
   const [newLabel, setNewLabel] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
@@ -40,24 +34,6 @@ export function ChecklistEditor({
     run(() => reorderChecklistItemsAction(next.map((i) => i.id)));
   }
 
-  if (!isAdmin) {
-    return (
-      <Card className="rounded-2xl">
-        <CardContent>
-          <ul className="flex flex-col gap-2 text-sm">
-            {items.map((item) => (
-              <li key={item.id} className="rounded-lg border px-3 py-2">
-                {item.label}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Only admins can edit the checklist.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card className="rounded-2xl">

@@ -132,7 +132,6 @@ export async function addEmployeeCommentAction(
 export async function addChecklistItemAction(label: unknown): Promise<ActionResult> {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     const parsed = checklistItemSchema.safeParse({ label });
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid label." };
@@ -151,7 +150,6 @@ export async function renameChecklistItemAction(
 ): Promise<ActionResult> {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     const parsed = checklistItemSchema.safeParse({ label });
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid label." };
@@ -167,7 +165,6 @@ export async function renameChecklistItemAction(
 export async function removeChecklistItemAction(itemId: string): Promise<ActionResult> {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     await removeChecklistItem(profile, itemId);
     revalidatePath("/settings/checklist");
     return { ok: true };
@@ -179,7 +176,6 @@ export async function removeChecklistItemAction(itemId: string): Promise<ActionR
 export async function reorderChecklistItemsAction(orderedIds: string[]): Promise<ActionResult> {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     await reorderChecklistItems(profile, orderedIds);
     revalidatePath("/settings/checklist");
     return { ok: true };
@@ -193,7 +189,6 @@ export async function reorderChecklistItemsAction(orderedIds: string[]): Promise
 export async function saveClickUpAction(input: unknown): Promise<ActionResult> {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     const parsed = clickupSettingsSchema.safeParse(input);
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid settings." };
@@ -224,7 +219,6 @@ export async function getClickUpListsAction(): Promise<
 > {
   try {
     const profile = await requireProfile();
-    if (profile.role !== "admin") return { ok: false, error: "Admins only." };
     const result = await getClickUpLists(profile);
     if (!result.ok) return result;
     return { ok: true, data: { lists: result.lists } };

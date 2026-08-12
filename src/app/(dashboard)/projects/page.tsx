@@ -7,6 +7,7 @@ import { listProjects } from "@/lib/data/projects";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { NewProjectDialog } from "@/components/dashboard/new-project-dialog";
+import { AutoRefresh } from "@/components/dashboard/auto-refresh";
 
 export const metadata = { title: "Projects" };
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function ProjectsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AutoRefresh />
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Projects</h1>

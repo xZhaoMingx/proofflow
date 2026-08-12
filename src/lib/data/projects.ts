@@ -71,7 +71,9 @@ export async function listProjects(profile: Profile): Promise<ProjectListItem[]>
   const supabase = await db();
   const { data: projects } = await supabase
     .from("projects")
-    .select("*, customers(*), proof_versions(version_number), review_links(token, revoked_at)")
+    .select(
+      "*, customers!projects_customer_id_fkey(*), proof_versions(version_number), review_links(token, revoked_at)"
+    )
     .eq("company_id", profile.company_id)
     .order("updated_at", { ascending: false });
 
@@ -130,7 +132,7 @@ export async function getProjectDetail(
   const supabase = await db();
   const { data: project } = await supabase
     .from("projects")
-    .select("*, companies(*), customers(*), profiles:designer_id(id, full_name)")
+    .select("*, companies(*), customers!projects_customer_id_fkey(*), profiles:designer_id(id, full_name)")
     .eq("id", projectId)
     .maybeSingle();
   if (!project) return null;
