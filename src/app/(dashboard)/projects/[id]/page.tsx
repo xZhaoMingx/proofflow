@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { ArrowLeft } from "lucide-react";
 import { getSessionProfile } from "@/lib/auth";
 import { getProjectDetail } from "@/lib/data/projects";
+import { getConnection } from "@/lib/data/clickup";
 import { StatusBadge } from "@/components/status-badge";
 import { StatusSelect } from "@/components/dashboard/status-select";
 import { VersionUploadCard } from "@/components/dashboard/version-upload-card";
@@ -30,6 +31,12 @@ export default async function ProjectDetailPage({
 
   const { project, customer, designer, versions, reviewLinks, comments, activity, clickup } =
     detail;
+
+  // Declutter: only surface the ClickUp card when the team has actually
+  // connected ClickUp (Settings → ClickUp), or when this project is already
+  // linked to a task (so an existing link never silently disappears).
+  const clickupConnection = await getConnection(profile);
+  const showClickUp = Boolean(clickupConnection) || Boolean(clickup);
 
   return (
     <div className="flex flex-col gap-5">
@@ -65,7 +72,7 @@ export default async function ProjectDetailPage({
         </div>
         <div className="flex flex-col gap-4">
           <ReviewLinksCard projectId={project.id} links={reviewLinks} />
-          <ClickUpCard projectId={project.id} link={clickup} />
+          {showClickUp && <ClickUpCard projectId={project.id} link={clickup} />}
           <Card className="rounded-2xl border-dashed">
             <CardContent className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Internal notes</span> live in the
