@@ -9,6 +9,7 @@ import {
   verifyCredentials,
 } from "@/lib/data/accounts";
 import { createOrJoinTeam, markLogin } from "@/lib/data/team-auth";
+import { acceptInvitation } from "@/lib/data/invitations";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -85,6 +86,34 @@ export async function signupAction(input: unknown): Promise<Result> {
   });
   if (!result.ok) return result;
   await startSession(result.profile.id);
+  return { ok: true };
+}
+
+const acceptInviteSchema = z.object({
+  token: z.string().min(1, "Missing invite token."),
+  fullName: z.string().trim().min(1, "Enter your name.").max(200),
+  email: z.string().trim().email("Enter a valid email.").max(320),
+  password: z.string().min(8, "Password must be at least 8 characters.").max(200),
+});
+
+export async function acceptInviteAction(input: unknown): Promise<Result> {
+  const parsed = acceptInviteSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  if (!isSupabaseConfigured()) {
+    return { ok: false, error: "Invites are only available on the live site." };
+  }
+
+  const accepted = await acceptInvitation(parsed.data);
+  if (!accepted.ok) return accepted;
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+  if (error) return { ok: false, error: "Account created — please log in." };
   return { ok: true };
 }
 

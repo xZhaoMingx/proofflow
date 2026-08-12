@@ -8,7 +8,7 @@ export type ProjectStatus =
   | "completed"
   | "archived";
 
-export type ProfileRole = "admin" | "employee";
+export type ProfileRole = "owner" | "admin" | "employee";
 
 export type AuthorType = "employee" | "customer" | "system";
 
