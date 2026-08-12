@@ -45,6 +45,12 @@ export default async function DashboardLayout({
                 Projects
               </Link>
               <Link
+                href="/settings/team"
+                className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                Team
+              </Link>
+              <Link
                 href="/settings/checklist"
                 className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
