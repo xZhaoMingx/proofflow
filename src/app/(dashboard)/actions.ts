@@ -1,6 +1,5 @@
 "use server";
 
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getSessionProfile } from "@/lib/auth";
 import {
@@ -23,16 +22,10 @@ import {
   uploadVersionSchema,
   validateProofFile,
 } from "@/lib/validation";
-import { createInvitation, revokeInvitation } from "@/lib/data/invitations";
-import { appUrl, isDemoMode } from "@/lib/env";
+import { isDemoMode } from "@/lib/env";
 import { demoDb } from "@/lib/data/demo-store";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ProjectStatus } from "@/lib/types";
-
-const inviteSchema = z.object({
-  email: z.string().trim().email("Enter a valid email.").max(320),
-  fullName: z.string().trim().min(1, "Enter their name.").max(200),
-});
 
 type ActionResult<T = undefined> =
   | { ok: true; data?: T }
@@ -188,48 +181,6 @@ export async function reorderChecklistItemsAction(orderedIds: string[]): Promise
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Failed to reorder." };
-  }
-}
-
-// --- Team invitations (owner only) -------------------------------------------
-
-export async function inviteTeammateAction(
-  email: unknown,
-  fullName: unknown
-): Promise<{ ok: true; link: string; email: string } | { ok: false; error: string }> {
-  try {
-    const profile = await requireProfile();
-    if (profile.role !== "owner") {
-      return { ok: false, error: "Only the team owner can invite people." };
-    }
-    const parsed = inviteSchema.safeParse({ email, fullName });
-    if (!parsed.success) {
-      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
-    }
-    const result = await createInvitation(profile, parsed.data);
-    if (!result.ok) return result;
-    revalidatePath("/settings/team");
-    return {
-      ok: true,
-      link: `${appUrl()}/join?token=${result.token}`,
-      email: parsed.data.email,
-    };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Failed to create invite." };
-  }
-}
-
-export async function revokeInvitationAction(id: string): Promise<ActionResult> {
-  try {
-    const profile = await requireProfile();
-    if (profile.role !== "owner") {
-      return { ok: false, error: "Only the team owner can manage invites." };
-    }
-    await revokeInvitation(profile, id);
-    revalidatePath("/settings/team");
-    return { ok: true };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Failed to revoke invite." };
   }
 }
 

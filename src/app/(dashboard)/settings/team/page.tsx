@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
-import { isDemoMode, appUrl } from "@/lib/env";
-import { listTeamMembers, listPendingInvitations } from "@/lib/data/invitations";
-import { TeamInvitePanel } from "@/components/dashboard/team-invite-panel";
+import { isDemoMode } from "@/lib/env";
+import { listTeamMembers } from "@/lib/data/team-auth";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata = { title: "Team" };
@@ -18,37 +17,30 @@ export default async function TeamPage() {
   const profile = await getSessionProfile();
   if (!profile) redirect("/login");
 
-  const isOwner = profile.role === "owner";
-
   if (isDemoMode()) {
     return (
       <div className="mx-auto flex max-w-2xl flex-col gap-6">
         <div>
           <h1 className="text-xl font-semibold">Team</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Inviting teammates is available on the live site (Supabase mode).
+            Team members are shown on the live site (Supabase mode).
           </p>
         </div>
       </div>
     );
   }
 
-  const [members, pending] = await Promise.all([
-    listTeamMembers(profile),
-    isOwner ? listPendingInvitations(profile) : Promise.resolve([]),
-  ]);
+  const members = await listTeamMembers(profile);
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Team</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Everyone here shares one workspace and sees every project.
-          {isOwner ? " Invite a teammate with a private link — no team code needed." : ""}
+          Everyone here shares one workspace and sees every project. Share your team code so
+          teammates can join.
         </p>
       </div>
-
-      {isOwner && <TeamInvitePanel pending={pending} baseUrl={appUrl()} />}
 
       <Card className="rounded-2xl">
         <CardContent className="flex flex-col gap-2">

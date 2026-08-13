@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import type { Profile } from "@/lib/types";
 
 /**
  * Team signup for Supabase mode. A team code identifies a team: entering a
@@ -135,4 +136,27 @@ export async function markLogin(userId: string): Promise<void> {
   } catch {
     // non-critical
   }
+}
+
+export interface TeamMember {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+}
+
+/** Everyone on the caller's team, for the read-only roster. */
+export async function listTeamMembers(profile: Profile): Promise<TeamMember[]> {
+  const admin = createSupabaseAdminClient();
+  const { data } = await admin
+    .from("profiles")
+    .select("id, full_name, email, role, created_at")
+    .eq("company_id", profile.company_id)
+    .order("created_at", { ascending: true });
+  return (data ?? []).map((m) => ({
+    id: m.id,
+    full_name: m.full_name,
+    email: m.email,
+    role: m.role,
+  }));
 }
