@@ -2,11 +2,11 @@ import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Single-shared-team signup for Supabase mode. The first person to sign up
- * creates the team and becomes its owner (choosing a team code); everyone
- * afterwards joins that same team by entering the matching code. All members
- * share one workspace and see every project — company isolation still holds if
- * a second team is ever created, but the app is built around one team here.
+ * Team signup for Supabase mode. A team code identifies a team: entering a
+ * brand-new code creates a new team (you become its owner); entering a code
+ * that already belongs to a team joins that team as a member. Members of a team
+ * share one workspace and see every project; separate teams are fully isolated
+ * by company_id + RLS.
  */
 
 const DEFAULT_CHECKLIST = [
@@ -30,19 +30,27 @@ export async function createOrJoinTeam(
   input: CreateOrJoinInput
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const admin = createSupabaseAdminClient();
+  const code = input.teamCode.trim();
+  if (!code) return { ok: false, error: "Enter a team code." };
 
-  // Is there already a team? (One shared workspace.)
-  const { data: teams } = await admin
+  // A team code identifies a team: a matching code joins that team, a brand-new
+  // code creates a new team with this user as its owner.
+  const { data: matches } = await admin
     .from("companies")
-    .select("id, name, settings")
+    .select("id")
+    .eq("settings->>join_code", code)
     .limit(1);
-  const existing = teams?.[0];
+  const existing = matches?.[0];
 
   let companyId: string;
   let role: "owner" | "employee";
 
-  if (!existing) {
-    // First user creates the team and becomes owner.
+  if (existing) {
+    // Existing code → join that team.
+    companyId = existing.id;
+    role = "employee";
+  } else {
+    // New code → create a new team; this user becomes its owner.
     const name = input.teamName?.trim() || `${input.fullName}'s Team`;
     const base = slugify(name) || "team";
     let slug = base;
@@ -61,7 +69,7 @@ export async function createOrJoinTeam(
       .insert({
         name,
         slug,
-        settings: { require_full_checklist: true, capture_ip: false, join_code: input.teamCode },
+        settings: { require_full_checklist: true, capture_ip: false, join_code: code },
       })
       .select("id")
       .single();
@@ -74,14 +82,6 @@ export async function createOrJoinTeam(
     await admin.from("checklist_items").insert(
       DEFAULT_CHECKLIST.map((label, i) => ({ company_id: companyId, label, sort_order: i }))
     );
-  } else {
-    // Everyone else joins the existing team with the shared code.
-    const code = (existing.settings as { join_code?: string } | null)?.join_code ?? "";
-    if (code && input.teamCode.trim() !== code) {
-      return { ok: false, error: "Wrong team code — ask a teammate for it." };
-    }
-    companyId = existing.id;
-    role = "employee";
   }
 
   // Create the auth user (pre-confirmed so they can sign in immediately).
