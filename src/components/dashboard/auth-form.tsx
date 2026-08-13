@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Layers, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { loginAction, signupAction } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,19 @@ export function AuthForm({
   // With no accounts yet, open on "Create account" so the first admin can register.
   const [tab, setTab] = useState<"login" | "signup">(hasAccounts ? "login" : "signup");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const PasswordToggle = (
+    <button
+      type="button"
+      onClick={() => setShowPassword((v) => !v)}
+      aria-label={showPassword ? "Hide password" : "Show password"}
+      tabIndex={-1}
+      className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground"
+    >
+      {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+    </button>
+  );
 
   async function handleLogin(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -88,13 +101,17 @@ export function AuthForm({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="login-password">Password</Label>
-                <Input
-                  id="login-password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    className="pr-10"
+                  />
+                  {PasswordToggle}
+                </div>
               </div>
               <Button type="submit" disabled={busy}>
                 {busy && <Loader2 className="size-4 animate-spin" />} Log in
@@ -114,14 +131,18 @@ export function AuthForm({
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input
-                  id="signup-password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                />
+                <div className="relative">
+                  <Input
+                    id="signup-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    className="pr-10"
+                  />
+                  {PasswordToggle}
+                </div>
                 <p className="text-xs text-muted-foreground">At least 8 characters.</p>
               </div>
               {codeRequired && (
@@ -129,9 +150,8 @@ export function AuthForm({
                   <Label htmlFor="signup-code">Team code</Label>
                   <Input id="signup-code" name="code" type="password" required />
                   <p className="text-xs text-muted-foreground">
-                    {hasAccounts
-                      ? "Enter your team's code to join and see everyone's projects."
-                      : "You're first — pick a team code, then share it so teammates can join."}
+                    A new code creates your team; an existing code joins that team and its
+                    projects.
                   </p>
                 </div>
               )}

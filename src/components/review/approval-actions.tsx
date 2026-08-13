@@ -19,13 +19,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { MAX_ATTACHMENTS } from "@/lib/types";
-import type { ChecklistResponse, ProofVersion, ReviewContext } from "@/lib/types";
+import type { ProofVersion, ReviewContext } from "@/lib/types";
 
 interface ApprovalActionsProps {
   token: string;
   context: ReviewContext;
   currentVersion: ProofVersion;
-  responsesForVersion: ChecklistResponse[];
+  checkedItemIds: Set<string>;
   isLatestVersion: boolean;
   onDone: () => void;
 }
@@ -34,7 +34,7 @@ export function ApprovalActions({
   token,
   context,
   currentVersion,
-  responsesForVersion,
+  checkedItemIds,
   isLatestVersion,
   onDone,
 }: ApprovalActionsProps) {
@@ -75,9 +75,7 @@ export function ApprovalActions({
   }
 
   const requireFullChecklist = company.settings.require_full_checklist !== false;
-  const checkedIds = new Set(
-    responsesForVersion.filter((r) => r.checked).map((r) => r.checklist_item_id)
-  );
+  const checkedIds = checkedItemIds;
   const allChecked = checklistItems.every((i) => checkedIds.has(i.id));
   const approveBlocked =
     !isLatestVersion || (requireFullChecklist && !allChecked) || finished;

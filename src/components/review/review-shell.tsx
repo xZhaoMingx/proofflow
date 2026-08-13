@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Layers } from "lucide-react";
 import type { ReviewContext } from "@/lib/types";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -54,6 +55,47 @@ export function ReviewShell({ token, context, proofUrls }: ReviewShellProps) {
     () =>
       context.checklistResponses.filter((r) => r.proof_version_id === currentVersion?.id),
     [context.checklistResponses, currentVersion]
+  );
+
+  // Checklist state lives here so the checkboxes and the approve button share it.
+  // Ticking an item updates instantly and persists in the background — no page
+  // refresh, so the review page no longer flickers on every click.
+  const [checkedMap, setCheckedMap] = useState<Map<string, boolean>>(
+    () => new Map(responsesForVersion.map((r) => [r.checklist_item_id, r.checked]))
+  );
+  // Reseed only when switching versions — not on the background poll, so
+  // in-progress ticks are never clobbered.
+  useEffect(() => {
+    setCheckedMap(
+      new Map(responsesForVersion.map((r) => [r.checklist_item_id, r.checked]))
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVersion?.id]);
+
+  const checkedItemIds = useMemo(
+    () => new Set([...checkedMap].filter(([, v]) => v).map(([id]) => id)),
+    [checkedMap]
+  );
+
+  const toggleChecklistItem = useCallback(
+    (itemId: string, checked: boolean) => {
+      if (!currentVersion) return;
+      const versionId = currentVersion.id;
+      setCheckedMap((prev) => new Map(prev).set(itemId, checked));
+      fetch(`/api/review/${token}/checklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId, itemId, checked }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error();
+        })
+        .catch(() => {
+          setCheckedMap((prev) => new Map(prev).set(itemId, !checked));
+          toast.error("Couldn't save your checklist — please try again.");
+        });
+    },
+    [token, currentVersion]
   );
 
   const refresh = useCallback(() => router.refresh(), [router]);
@@ -112,10 +154,9 @@ export function ReviewShell({ token, context, proofUrls }: ReviewShellProps) {
           <ProjectInfoCard context={context} currentVersion={currentVersion} />
 
           <ReviewChecklist
-            token={token}
             items={context.checklistItems}
-            responses={responsesForVersion}
-            versionId={currentVersion.id}
+            checkedMap={checkedMap}
+            onToggle={toggleChecklistItem}
             disabled={project.status === "approved" || project.status === "completed"}
           />
 
@@ -123,7 +164,7 @@ export function ReviewShell({ token, context, proofUrls }: ReviewShellProps) {
             token={token}
             context={context}
             currentVersion={currentVersion}
-            responsesForVersion={responsesForVersion}
+            checkedItemIds={checkedItemIds}
             isLatestVersion={isLatestVersion}
             onDone={refresh}
           />
